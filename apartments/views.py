@@ -23,16 +23,48 @@ from .permissions import (
 import logging
 
 logger = logging.getLogger(__name__)
+
+
 class ApartmentListView(generics.ListCreateAPIView):
     """
     List all apartments or create a new apartment.
+    
+    Supports filtering, searching, and ordering:
+    - Filter by district, sector, amenities, availability
+    - Filter by price range (min_price, max_price)
+    - Search by title, description, address, landmarks
+    - Order by price (asc/desc) or creation date
     """
     serializer_class = ApartmentSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['district', 'sector', 'availability_status', 'is_furnished', 'has_wifi', 'has_parking']
-    search_fields = ['title', 'description', 'address', 'nearby_landmarks']
-    ordering_fields = ['price_daily', 'created_at', 'updated_at']
-    ordering = ['-created_at']
+    
+    # Filtering configuration
+    filterset_fields = [
+        'district', 
+        'sector', 
+        'availability_status', 
+        'is_furnished', 
+        'has_wifi', 
+        'has_parking'
+    ]
+    
+    # Search configuration
+    search_fields = [
+        'title', 
+        'description', 
+        'address', 
+        'nearby_landmarks',
+        'district',
+        'sector'
+    ]
+    
+    # Ordering configuration
+    ordering_fields = [
+        'price_daily', 
+        'created_at', 
+        'updated_at'
+    ]
+    ordering = ['-created_at']  # Default ordering: newest first
     
     def get_permissions(self):
         """
@@ -55,9 +87,18 @@ class ApartmentListView(generics.ListCreateAPIView):
         max_price = self.request.query_params.get('max_price')
         
         if min_price:
-            queryset = queryset.filter(price_daily__gte=min_price)
+            try:
+                min_price = float(min_price)
+                queryset = queryset.filter(price_daily__gte=min_price)
+            except ValueError:
+                pass
+        
         if max_price:
-            queryset = queryset.filter(price_daily__lte=max_price)
+            try:
+                max_price = float(max_price)
+                queryset = queryset.filter(price_daily__lte=max_price)
+            except ValueError:
+                pass
         
         # Filter by verification status (only show verified if not admin/owner)
         user = self.request.user
@@ -65,6 +106,36 @@ class ApartmentListView(generics.ListCreateAPIView):
             queryset = queryset.filter(is_verified=True)
         
         return queryset
+    
+    @swagger_auto_schema(
+        operation_description="List apartments with filtering, search, and ordering",
+        manual_parameters=[
+            # Filter parameters
+            openapi.Parameter('district', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='Filter by district'),
+            openapi.Parameter('sector', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='Filter by sector'),
+            openapi.Parameter('is_furnished', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, description='Filter by furnished status'),
+            openapi.Parameter('has_wifi', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, description='Filter by WiFi availability'),
+            openapi.Parameter('has_parking', openapi.IN_QUERY, type=openapi.TYPE_BOOLEAN, description='Filter by parking availability'),
+            openapi.Parameter('availability_status', openapi.IN_QUERY, type=openapi.TYPE_STRING, enum=['available', 'booked'], description='Filter by availability'),
+            openapi.Parameter('min_price', openapi.IN_QUERY, type=openapi.TYPE_NUMBER, description='Minimum daily price'),
+            openapi.Parameter('max_price', openapi.IN_QUERY, type=openapi.TYPE_NUMBER, description='Maximum daily price'),
+            
+            # Search parameter
+            openapi.Parameter('search', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='Search by title, description, address, or landmarks'),
+            
+            # Ordering parameters
+            openapi.Parameter('ordering', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='Order by field (price_daily, created_at, -price_daily, -created_at)'),
+        ],
+        responses={
+            200: ApartmentSerializer(many=True),
+            400: 'Bad Request'
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        """
+        Get list of apartments with all filtering options.
+        """
+        return super().get(request, *args, **kwargs)
     
     def perform_create(self, serializer):
         """
@@ -124,6 +195,37 @@ class ApartmentVerifyView(generics.UpdateAPIView):
             'message': _('Apartment verified successfully.'),
             'apartment': ApartmentSerializer(instance, context=self.get_serializer_context()).data
         })
+
+
+class ApartmentMediaListView(generics.ListAPIView):
+    """
+    List all media files for a specific apartment.
+    """
+    serializer_class = ApartmentMediaSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        """Get media files for the specified apartment."""
+        apartment_id = self.kwargs.get('apartment_id')
+        apartment = get_object_or_404(Apartment, id=apartment_id)
+        
+        # If apartment is not verified and user is not owner/admin, return empty
+        if not apartment.is_verified:
+            user = self.request.user
+            if not user.is_authenticated or (user != apartment.owner and user.role != 'admin'):
+                return ApartmentMedia.objects.none()
+        
+        return ApartmentMedia.objects.filter(apartment=apartment).order_by('-uploaded_at')
+    
+    def list(self, request, *args, **kwargs):
+        """Override list to return appropriate response."""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return Response({
+            'count': queryset.count(),
+            'results': serializer.data
+        }, status=status.HTTP_200_OK)
 
 
 class ApartmentMediaUploadView(APIView):
@@ -228,6 +330,7 @@ class ApartmentMediaUploadView(APIView):
         
         return Response(response_data, status=status_code)
 
+
 class ApartmentMediaDetailView(generics.RetrieveAPIView):
     """
     Retrieve a specific media file.
@@ -288,6 +391,7 @@ class ApartmentMediaDeleteView(generics.DestroyAPIView):
             {'message': _("Media deleted successfully.")},
             status=status.HTTP_200_OK
         )
+
 
 class ApartmentMediaBulkDeleteView(APIView):
     """
@@ -366,33 +470,3 @@ class ApartmentMediaBulkDeleteView(APIView):
             },
             status=status.HTTP_200_OK
         )
-
-class ApartmentMediaListView(generics.ListAPIView):
-    """
-    List all media files for a specific apartment.
-    """
-    serializer_class = ApartmentMediaSerializer
-    permission_classes = [AllowAny]
-    
-    def get_queryset(self):
-        """Get media files for the specified apartment."""
-        apartment_id = self.kwargs.get('apartment_id')
-        apartment = get_object_or_404(Apartment, id=apartment_id)
-        
-        # If apartment is not verified and user is not owner/admin, return empty
-        if not apartment.is_verified:
-            user = self.request.user
-            if not user.is_authenticated or (user != apartment.owner and user.role != 'admin'):
-                return ApartmentMedia.objects.none()
-        
-        return ApartmentMedia.objects.filter(apartment=apartment).order_by('-uploaded_at')
-    
-    def list(self, request, *args, **kwargs):
-        """Override list to return appropriate response."""
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        
-        return Response({
-            'count': queryset.count(),
-            'results': serializer.data
-        }, status=status.HTTP_200_OK)

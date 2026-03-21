@@ -17,8 +17,11 @@ from .serializers import (
 from .permissions import (
     IsBookingOwner, IsApartmentOwnerOrAdmin, CanVerifyPayment
 )
+from django.contrib.auth import get_user_model
+from utils.email_utils import EmailNotificationService
+from django.db import transaction
 
-
+User = get_user_model()
 class BookingCreateView(generics.CreateAPIView):
     """
     Create a new booking.
@@ -26,12 +29,27 @@ class BookingCreateView(generics.CreateAPIView):
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
     
+    @transaction.atomic
     def perform_create(self, serializer):
         """
-        Create booking with current user.
+        Create booking and send notifications.
         """
-        serializer.save(user=self.request.user)
-
+        # Create booking
+        booking = serializer.save(user=self.request.user)
+        
+        # Get all admin emails
+        admin_emails = User.objects.filter(
+            role='admin',
+            is_active=True
+        ).values_list('email', flat=True)
+        
+        # Send email notifications
+        EmailNotificationService.send_booking_created_email(
+            booking=booking,
+            admin_emails=list(admin_emails)
+        )
+        
+        return booking
 
 class MyBookingsView(generics.ListAPIView):
     """

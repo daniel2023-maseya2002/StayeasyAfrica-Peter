@@ -8,12 +8,17 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from django.contrib.auth import get_user_model
+import logging
 
 from .models import Payment
 from .serializers import (
     PaymentSerializer, PaymentVerifySerializer, PaymentRejectSerializer
 )
 from .permissions import IsBookingOwner, CanVerifyPayment
+from utils.email_utils import EmailNotificationService
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 class PaymentSubmitView(generics.CreateAPIView):
@@ -44,12 +49,30 @@ class PaymentSubmitView(generics.CreateAPIView):
     @transaction.atomic
     def post(self, request, *args, **kwargs):
         """
-        Create payment with validation.
+        Create payment with validation and send notifications.
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
+        # Create payment
         payment = serializer.save()
+        
+        # Get all admin emails
+        admin_emails = User.objects.filter(
+            role='admin',
+            is_active=True
+        ).values_list('email', flat=True)
+        
+        # Send email notifications (non-blocking)
+        try:
+            EmailNotificationService.send_payment_submitted_email(
+                payment=payment,
+                admin_emails=list(admin_emails)
+            )
+            logger.info(f"Payment submission email sent for payment #{payment.id}")
+        except Exception as e:
+            # Log error but don't rollback transaction
+            logger.error(f"Failed to send payment submission email for payment #{payment.id}: {str(e)}")
         
         return Response({
             'message': _('Payment submitted successfully.'),
@@ -176,6 +199,15 @@ class PaymentVerifyView(generics.UpdateAPIView):
         
         with transaction.atomic():
             self.perform_update(serializer)
+            
+            # Send email notifications (non-blocking)
+            try:
+                EmailNotificationService.send_payment_verified_email(
+                    payment=instance
+                )
+                logger.info(f"Payment verification email sent for payment #{instance.id}")
+            except Exception as e:
+                logger.error(f"Failed to send payment verification email for payment #{instance.id}: {str(e)}")
         
         return Response({
             'message': _('Payment verified and booking confirmed successfully.'),
@@ -196,7 +228,10 @@ class PaymentRejectView(generics.UpdateAPIView):
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'rejection_reason': openapi.Schema(type=openapi.TYPE_STRING, description='Reason for rejection'),
+                'rejection_reason': openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description='Reason for rejection (optional)'
+                ),
             }
         ),
         responses={
@@ -224,6 +259,19 @@ class PaymentRejectView(generics.UpdateAPIView):
         
         with transaction.atomic():
             self.perform_update(serializer)
+            
+            # Get rejection reason if provided
+            rejection_reason = serializer.validated_data.get('rejection_reason')
+            
+            # Send email notifications (non-blocking)
+            try:
+                EmailNotificationService.send_payment_rejected_email(
+                    payment=instance,
+                    rejection_reason=rejection_reason
+                )
+                logger.info(f"Payment rejection email sent for payment #{instance.id}")
+            except Exception as e:
+                logger.error(f"Failed to send payment rejection email for payment #{instance.id}: {str(e)}")
         
         return Response({
             'message': _('Payment rejected successfully.'),
@@ -259,7 +307,7 @@ class PaymentStatisticsView(APIView):
         """
         Return payment statistics.
         """
-        from django.db.models import Sum, Count, Q
+        from django.db.models import Sum
         from django.utils import timezone
         from datetime import timedelta
         

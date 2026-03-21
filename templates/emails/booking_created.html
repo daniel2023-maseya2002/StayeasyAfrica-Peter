@@ -1,0 +1,133 @@
+<!-- stayease/templates/emails/booking_created.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Booking - StayEase Africa</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .booking-details {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #f0f0f0;
+            font-size: 12px;
+            color: #777;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>{{ company_name }}</h2>
+        </div>
+        
+        <div class="content">
+            <h3>New Booking Received!</h3>
+            
+            <p>Hello,</p>
+            
+            <p>A new booking has been created for <strong>{{ apartment_title }}</strong>.</p>
+            
+            <div class="booking-details">
+                <h4>Booking Details:</h4>
+                <div class="detail-row">
+                    <span class="detail-label">Booking ID:</span> #{{ booking_id }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Guest:</span> {{ user_full_name }} ({{ user_email }})
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phone:</span> {{ phone_number }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Check-in:</span> {{ start_date|date:"F j, Y" }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Check-out:</span> {{ end_date|date:"F j, Y" }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Nights:</span> {{ nights }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Location:</span> {{ apartment_location }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Total Price:</span> 
+                    <span class="amount">${{ total_price }}</span>
+                </div>
+            </div>
+            
+            <p><strong>Next Steps:</strong></p>
+            <ol>
+                <li>Wait for the guest to submit payment reference</li>
+                <li>Verify the payment when received</li>
+                <li>Confirm the booking after verification</li>
+            </ol>
+            
+            <p style="text-align: center;">
+                <a href="{{ dashboard_url }}" class="button">View in Dashboard</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; {{ year|default:"2024" }} {{ company_name }}. All rights reserved.</p>
+            <p>
+                <a href="mailto:{{ support_email }}" style="color: #777;">Contact Support</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

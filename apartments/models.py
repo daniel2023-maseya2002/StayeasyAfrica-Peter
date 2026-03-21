@@ -152,6 +152,22 @@ class Apartment(models.Model):
         
         super().save(*args, **kwargs)
 
+        @property
+        def average_rating(self):
+            """
+            Calculate average rating from all reviews.
+            """
+            from django.db.models import Avg
+            avg = self.reviews.aggregate(Avg('rating'))['rating__avg']
+            return round(avg, 1) if avg else None
+        
+        @property
+        def total_reviews(self):
+            """
+            Get total number of reviews.
+            """
+            return self.reviews.count()
+
 
 class ApartmentMedia(models.Model):
     """

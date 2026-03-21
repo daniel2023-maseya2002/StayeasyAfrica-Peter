@@ -1,0 +1,116 @@
+<!-- stayease/templates/emails/payment_verified.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Verified - StayEase Africa</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .success-icon {
+            text-align: center;
+            font-size: 48px;
+            color: #28a745;
+            margin: 20px 0;
+        }
+        .booking-details {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #f0f0f0;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>{{ company_name }}</h2>
+        </div>
+        
+        <div class="content">
+            <div class="success-icon">
+                ✓
+            </div>
+            
+            <h3>Payment Verified! 🎉</h3>
+            
+            <p>Hello {{ user_full_name }},</p>
+            
+            <p>Your payment for <strong>{{ apartment_title }}</strong> has been verified and your booking is now confirmed!</p>
+            
+            <div class="booking-details">
+                <h4>Booking Confirmation:</h4>
+                <div class="detail-row">
+                    <span class="detail-label">Booking ID:</span> #{{ booking_id }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Apartment:</span> {{ apartment_title }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Check-in:</span> {{ start_date|date:"F j, Y" }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Check-out:</span> {{ end_date|date:"F j, Y" }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Amount Paid:</span> <strong>${{ amount }}</strong>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Payment Method:</span> {{ payment_method }}
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Transaction ID:</span> {{ transaction_id }}
+                </div>
+            </div>
+            
+            <p>You can now prepare for your stay. If you have any questions, feel free to contact the host.</p>
+            
+            <p style="text-align: center;">
+                <a href="{{ dashboard_url }}" class="button">View My Bookings</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; {{ year|default:"2024" }} {{ company_name }}. All rights reserved.</p>
+            <p>
+                <a href="mailto:{{ support_email }}" style="color: #777;">Contact Support</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

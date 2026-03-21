@@ -11,9 +11,18 @@ urlpatterns = [
     path('<int:pk>/verify/', views.ApartmentVerifyView.as_view(), name='apartment-verify'),
     
     # Media endpoints
-    path('<int:apartment_id>/media/upload/', views.ApartmentMediaUploadView.as_view(), name='apartment-media-upload'),
-    path('media/<int:media_id>/delete/', views.ApartmentMediaDeleteView.as_view(), name='apartment-media-delete'),
+    # List media for an apartment
     path('<int:apartment_id>/media/', views.ApartmentMediaListView.as_view(), name='apartment-media-list'),
+    
+    # Upload media for an apartment
+    path('<int:apartment_id>/media/upload/', views.ApartmentMediaUploadView.as_view(), name='apartment-media-upload'),
+    
+    # Get specific media file
     path('media/<int:pk>/', views.ApartmentMediaDetailView.as_view(), name='apartment-media-detail'),
+    
+    # Delete specific media file
+    path('media/<int:pk>/delete/', views.ApartmentMediaDeleteView.as_view(), name='apartment-media-delete'),
+    
+    # Bulk delete media files
     path('media/bulk-delete/', views.ApartmentMediaBulkDeleteView.as_view(), name='apartment-media-bulk-delete'),
 ]

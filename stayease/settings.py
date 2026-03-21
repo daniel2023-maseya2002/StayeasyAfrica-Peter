@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'apartments',
     'bookings',
     'payments',
+    'reviews',
 ]
 
 MIDDLEWARE = [
@@ -72,6 +73,9 @@ DEFAULT_FROM_EMAIL = 'StayEase Africa <claimsmarks@gmail.com>'
 import os
 # EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 # EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+
+# Frontend URL for links in emails
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://stayeaseafrica.com')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
