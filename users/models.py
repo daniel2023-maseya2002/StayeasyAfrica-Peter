@@ -175,3 +175,5 @@ class PasswordResetOTP(models.Model):
             is_verified=False,
             is_used=False
         ).delete()
+
+

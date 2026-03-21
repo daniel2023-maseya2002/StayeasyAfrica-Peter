@@ -45,3 +45,4 @@ class IsAdminOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return obj == request.user or request.user.role == User.Role.ADMIN
         return request.user.role == User.Role.ADMIN or obj == request.user
+
