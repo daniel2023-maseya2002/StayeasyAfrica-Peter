@@ -454,3 +454,15 @@ class ResetPasswordView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+# Add this to your users/views.py temporarily
+class TestAuthView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        return Response({
+            'authenticated': True,
+            'user_id': request.user.id,
+            'user_email': request.user.email,
+            'user_role': request.user.role,
+        })

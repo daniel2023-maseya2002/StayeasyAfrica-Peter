@@ -21,4 +21,6 @@ urlpatterns = [
     path('create/', views.AdminUserCreateView.as_view(), name='admin-user-create'),
     path('profile/', views.UserProfileView.as_view(), name='user-profile'),
     path('<int:pk>/', views.UserDetailView.as_view(), name='user-detail'),
+
+    path('test-auth/', views.TestAuthView.as_view(), name='test-auth'),
 ]

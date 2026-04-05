@@ -100,9 +100,14 @@ class ApartmentListView(generics.ListCreateAPIView):
             except ValueError:
                 pass
         
-        # Filter by verification status (only show verified if not admin/owner)
+        # Filter by verification status
+        # Admin sees all apartments, others only see verified ones
         user = self.request.user
-        if not user.is_authenticated or user.role != 'admin':
+        if user.is_authenticated and user.role == 'admin':
+            # Admin sees all apartments (including unverified)
+            pass
+        else:
+            # Non-admin users only see verified apartments
             queryset = queryset.filter(is_verified=True)
         
         return queryset
@@ -470,6 +475,7 @@ class ApartmentMediaBulkDeleteView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
 
 class OwnerApartmentListView(generics.ListAPIView):
     """
