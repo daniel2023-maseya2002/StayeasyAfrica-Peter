@@ -8,6 +8,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .models import Booking
 from .serializers import (
@@ -15,7 +16,7 @@ from .serializers import (
     BookingVerifyPaymentSerializer, BookingCancelSerializer
 )
 from .permissions import (
-    IsBookingOwner, IsApartmentOwnerOrAdmin, CanVerifyPayment
+    IsBookingOwner, IsApartmentOwnerOrAdmin, CanVerifyPayment, IsAdmin
 )
 from django.contrib.auth import get_user_model
 from utils.email_utils import EmailNotificationService
@@ -324,3 +325,35 @@ class ApartmentAvailabilityView(APIView):
             'end_date': end_date,
             'message': _('Apartment is available for these dates.') if not overlapping else _('Apartment is already booked for these dates.')
         })
+
+class AdminBookingListView(generics.ListAPIView):
+    """
+    List all bookings for admin.
+    """
+    serializer_class = BookingSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'payment_status']
+    search_fields = ['user__email', 'apartment__title']
+    ordering_fields = ['created_at', 'start_date', 'total_price']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        return Booking.objects.all().select_related('user', 'apartment')
+
+class OwnerBookingListView(generics.ListAPIView):
+    """
+    List bookings for apartments owned by the logged-in user.
+    """
+    serializer_class = BookingSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'payment_status']
+    search_fields = ['user__email', 'apartment__title']
+    ordering_fields = ['created_at', 'start_date', 'total_price']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        return Booking.objects.filter(
+            apartment__owner=self.request.user
+        ).select_related('user', 'apartment', 'apartment__owner')

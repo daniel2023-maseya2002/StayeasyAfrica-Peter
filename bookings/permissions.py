@@ -33,3 +33,10 @@ class CanVerifyPayment(permissions.BasePermission):
             return True
         # Apartment owner can verify payments for their apartments
         return obj.apartment.owner == request.user
+
+class IsAdmin(permissions.BasePermission):
+    """
+    Custom permission to only allow admin users.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.role == 'admin'

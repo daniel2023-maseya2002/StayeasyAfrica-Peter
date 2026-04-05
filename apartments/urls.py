@@ -10,6 +10,8 @@ urlpatterns = [
     path('<int:pk>/', views.ApartmentDetailView.as_view(), name='apartment-detail'),
     path('<int:pk>/verify/', views.ApartmentVerifyView.as_view(), name='apartment-verify'),
     
+    # Add this line to urlpatterns
+    path('owner/', views.OwnerApartmentListView.as_view(), name='owner-apartment-list'),
     # Media endpoints
     # List media for an apartment
     path('<int:apartment_id>/media/', views.ApartmentMediaListView.as_view(), name='apartment-media-list'),

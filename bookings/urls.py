@@ -5,11 +5,17 @@ from . import views
 app_name = 'bookings'
 
 urlpatterns = [
+     # Admin endpoints
+    path('admin/', views.AdminBookingListView.as_view(), name='admin-booking-list'),
+
     # Booking CRUD
     path('', views.BookingCreateView.as_view(), name='booking-create'),
     path('my/', views.MyBookingsView.as_view(), name='my-bookings'),
     path('owner/', views.OwnerBookingsView.as_view(), name='owner-bookings'),
     path('<int:pk>/', views.BookingDetailView.as_view(), name='booking-detail'),
+    
+    # Add this line to urlpatterns
+    path('owner/', views.OwnerBookingListView.as_view(), name='owner-booking-list'),
     
     # Payment actions
     path('<int:pk>/submit-payment/', views.SubmitPaymentView.as_view(), name='submit-payment'),

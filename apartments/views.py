@@ -470,3 +470,13 @@ class ApartmentMediaBulkDeleteView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+class OwnerApartmentListView(generics.ListAPIView):
+    """
+    List apartments for the logged-in owner.
+    """
+    serializer_class = ApartmentSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Apartment.objects.filter(owner=self.request.user).select_related('owner').prefetch_related('media')

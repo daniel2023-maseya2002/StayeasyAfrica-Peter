@@ -49,6 +49,7 @@ class CanCreateApartment(permissions.BasePermission):
     Custom permission to only allow users with role 'owner' to create apartments.
     """
     def has_permission(self, request, view):
-        if view.action == 'create' or request.method == 'POST':
+        # Check if it's a POST request (create operation)
+        if request.method == 'POST':
             return request.user and request.user.is_authenticated and request.user.role == 'owner'
         return True

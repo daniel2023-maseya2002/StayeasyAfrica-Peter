@@ -10,6 +10,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.contrib.auth import get_user_model
 import logging
+from rest_framework.permissions import IsAuthenticated, AllowAny
+
 
 from .models import Payment
 from .serializers import (
@@ -344,3 +346,41 @@ class PaymentStatisticsView(APIView):
         }
         
         return Response(stats)
+
+# Add this new class for admin payments list
+class AdminPaymentListView(generics.ListAPIView):
+    """
+    List all payments for admin.
+    """
+    serializer_class = PaymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'payment_method']
+    search_fields = ['transaction_id', 'booking__user__email', 'booking__apartment__title']
+    ordering_fields = ['created_at', 'amount', 'verified_at']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return Payment.objects.all().select_related(
+                'booking', 'booking__user', 'booking__apartment'
+            )
+        return Payment.objects.none()
+
+class OwnerPaymentListView(generics.ListAPIView):
+    """
+    List payments for apartments owned by the logged-in user.
+    """
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'payment_method']
+    search_fields = ['transaction_id', 'booking__user__email']
+    ordering_fields = ['created_at', 'amount', 'verified_at']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        return Payment.objects.filter(
+            booking__apartment__owner=self.request.user
+        ).select_related('booking', 'booking__user', 'booking__apartment')
