@@ -1,0 +1,202 @@
+<!-- stayease/templates/emails/payment_rejected.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Update - StayEase Africa</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #1a1a2e;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            max-width: 580px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h2 {
+            color: white;
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .error-icon {
+            width: 70px;
+            height: 70px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .error-message {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid #fecaca;
+        }
+        .error-message h3 {
+            color: #dc2626;
+            margin: 0 0 10px;
+            font-size: 22px;
+        }
+        .details-card {
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #475569;
+        }
+        .detail-value {
+            color: #1e293b;
+            font-weight: 500;
+        }
+        .reason-box {
+            background: #fef3c7;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-left: 4px solid #f59e0b;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .button-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .button-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .footer {
+            background: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer p {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="error-icon">⚠️</div>
+            <h2>Payment Not Verified</h2>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0;">We couldn't verify your payment</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Hello {{ user_full_name }}
+            </div>
+            
+            <div class="error-message">
+                <h3>Payment Rejected</h3>
+                <p>We were unable to verify your payment for the booking.</p>
+            </div>
+            
+            <div class="details-card">
+                <div class="detail-row">
+                    <span class="detail-label">🏠 Apartment</span>
+                    <span class="detail-value">{{ apartment_title }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">💰 Amount</span>
+                    <span class="detail-value">${{ amount }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">💳 Payment Method</span>
+                    <span class="detail-value">{{ payment_method }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">🆔 Transaction ID</span>
+                    <span class="detail-value">{{ transaction_id }}</span>
+                </div>
+            </div>
+            
+            {% if rejection_reason %}
+            <div class="reason-box">
+                <strong>📋 Reason:</strong> {{ rejection_reason }}
+            </div>
+            {% endif %}
+            
+            <div style="background: #eff6ff; border-radius: 16px; padding: 16px; margin-bottom: 24px;">
+                <strong>💡 What you can do:</strong>
+                <ul style="margin: 10px 0 0 20px; font-size: 13px; color: #1e40af;">
+                    <li>Verify your payment details and try again</li>
+                    <li>Contact your mobile money provider to confirm the transaction</li>
+                    <li>Contact the host directly for assistance</li>
+                    <li>Reach out to our support team for help</li>
+                </ul>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="{{ dashboard_url }}" class="button-primary">Try Again →</a>
+                <a href="mailto:{{ support_email }}" class="button-secondary">Contact Support</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; {{ year }} {{ company_name }}. All rights reserved.</p>
+            <p>Making stays easy across Africa ❤️</p>
+            <p><a href="mailto:{{ support_email }}">Contact Support</a></p>
+        </div>
+    </div>
+</body>
+</html>

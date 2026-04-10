@@ -10,15 +10,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.contrib.auth import get_user_model
 import logging
-from rest_framework.permissions import IsAuthenticated, AllowAny
-
+from django.utils import timezone
 
 from .models import Payment
 from .serializers import (
     PaymentSerializer, PaymentVerifySerializer, PaymentRejectSerializer
 )
-from .permissions import IsBookingOwner, CanVerifyPayment
+from .permissions import IsBookingOwner, CanVerifyPayment, IsAdmin
 from utils.email_utils import EmailNotificationService
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -73,7 +73,6 @@ class PaymentSubmitView(generics.CreateAPIView):
             )
             logger.info(f"Payment submission email sent for payment #{payment.id}")
         except Exception as e:
-            # Log error but don't rollback transaction
             logger.error(f"Failed to send payment submission email for payment #{payment.id}: {str(e)}")
         
         return Response({
@@ -162,68 +161,93 @@ class PaymentDetailView(generics.RetrieveAPIView):
         self.permission_denied(request, message=_("You don't have permission to view this payment."))
 
 
-class PaymentVerifyView(generics.UpdateAPIView):
+# stayease/payments/views.py - Update the PaymentVerifyView class
+
+class PaymentVerifyView(APIView):
     """
-    Verify payment (admin or apartment owner only).
+    Verify payment (apartment owner only).
+    Updates payment status to 'verified' and booking status to 'confirmed'.
+    Also updates booking.payment_status to 'verified'.
     """
-    serializer_class = PaymentVerifySerializer
     permission_classes = [permissions.IsAuthenticated, CanVerifyPayment]
-    queryset = Payment.objects.all()
     
     @swagger_auto_schema(
         operation_description="Verify payment and confirm booking",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={}
-        ),
         responses={
-            200: "Payment verified successfully",
+            200: "Payment verified and booking confirmed",
             400: "Bad Request",
             403: "Forbidden",
             404: "Not Found"
         }
     )
     @transaction.atomic
-    def patch(self, request, *args, **kwargs):
+    def patch(self, request, pk):
         """
-        Partial update to verify payment.
+        Verify payment and update booking status.
         """
-        return self.partial_update(request, *args, **kwargs)
-    
-    def update(self, request, *args, **kwargs):
-        """
-        Update payment to verified and confirm booking.
-        """
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
+        try:
+            payment = Payment.objects.select_related('booking', 'booking__apartment').get(pk=pk)
+        except Payment.DoesNotExist:
+            return Response(
+                {'error': _('Payment not found.')},
+                status=status.HTTP_404_NOT_FOUND
+            )
         
-        with transaction.atomic():
-            self.perform_update(serializer)
-            
-            # Send email notifications (non-blocking)
-            try:
-                EmailNotificationService.send_payment_verified_email(
-                    payment=instance
-                )
-                logger.info(f"Payment verification email sent for payment #{instance.id}")
-            except Exception as e:
-                logger.error(f"Failed to send payment verification email for payment #{instance.id}: {str(e)}")
+        # Check permission (owner of the apartment)
+        self.check_object_permissions(request, payment)
+        
+        # Check if payment can be verified
+        if payment.status != Payment.Status.SUBMITTED:
+            return Response(
+                {'error': _('Only submitted payments can be verified.')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if payment.booking.status != 'pending':
+            return Response(
+                {'error': _('Only pending bookings can be confirmed.')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update payment status
+        payment.status = Payment.Status.VERIFIED
+        payment.verified_at = timezone.now()
+        payment.save()
+        
+        # Update booking status AND payment_status
+        booking = payment.booking
+        booking.status = 'confirmed'
+        booking.payment_status = 'verified'  # IMPORTANT: Update the booking's payment_status
+        booking.save()
+        
+        # Send email notification to user
+        try:
+            EmailNotificationService.send_payment_verified_email(payment=payment)
+            logger.info(f"Payment verification email sent for payment #{payment.id}")
+        except Exception as e:
+            logger.error(f"Failed to send payment verification email for payment #{payment.id}: {str(e)}")
         
         return Response({
             'message': _('Payment verified and booking confirmed successfully.'),
-            'payment': PaymentSerializer(instance, context=self.get_serializer_context()).data
-        })
+            'payment': {
+                'id': payment.id,
+                'status': payment.status,
+                'verified_at': payment.verified_at
+            },
+            'booking': {
+                'id': booking.id,
+                'status': booking.status,
+                'payment_status': booking.payment_status
+            }
+        }, status=status.HTTP_200_OK)
 
 
-class PaymentRejectView(generics.UpdateAPIView):
+class PaymentRejectView(APIView):
     """
-    Reject payment (admin or apartment owner only).
+    Reject payment (apartment owner only).
+    Updates payment status to 'rejected'. Booking remains pending.
     """
-    serializer_class = PaymentRejectSerializer
     permission_classes = [permissions.IsAuthenticated, CanVerifyPayment]
-    queryset = Payment.objects.all()
     
     @swagger_auto_schema(
         operation_description="Reject payment",
@@ -237,48 +261,76 @@ class PaymentRejectView(generics.UpdateAPIView):
             }
         ),
         responses={
-            200: "Payment rejected successfully",
+            200: "Payment rejected",
             400: "Bad Request",
             403: "Forbidden",
             404: "Not Found"
         }
     )
     @transaction.atomic
-    def patch(self, request, *args, **kwargs):
+    def patch(self, request, pk):
         """
-        Partial update to reject payment.
+        Reject payment and send notification.
         """
-        return self.partial_update(request, *args, **kwargs)
-    
-    def update(self, request, *args, **kwargs):
-        """
-        Update payment to rejected.
-        """
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
+        try:
+            payment = Payment.objects.select_related('booking', 'booking__apartment').get(pk=pk)
+        except Payment.DoesNotExist:
+            return Response(
+                {'error': _('Payment not found.')},
+                status=status.HTTP_404_NOT_FOUND
+            )
         
-        with transaction.atomic():
-            self.perform_update(serializer)
-            
-            # Get rejection reason if provided
-            rejection_reason = serializer.validated_data.get('rejection_reason')
-            
-            # Send email notifications (non-blocking)
-            try:
-                EmailNotificationService.send_payment_rejected_email(
-                    payment=instance,
-                    rejection_reason=rejection_reason
-                )
-                logger.info(f"Payment rejection email sent for payment #{instance.id}")
-            except Exception as e:
-                logger.error(f"Failed to send payment rejection email for payment #{instance.id}: {str(e)}")
+        # Check permission (owner of the apartment)
+        self.check_object_permissions(request, payment)
+        
+        # Check if payment can be rejected
+        if payment.status == Payment.Status.VERIFIED:
+            return Response(
+                {'error': _('Verified payments cannot be rejected.')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if payment.status == Payment.Status.REJECTED:
+            return Response(
+                {'error': _('Payment is already rejected.')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get rejection reason if provided
+        rejection_reason = request.data.get('rejection_reason', None)
+        
+        # Update payment status
+        payment.status = Payment.Status.REJECTED
+        payment.verified_at = timezone.now()
+        payment.save()
+        
+        # Update booking payment_status to 'rejected' (optional - depends on your business logic)
+        booking = payment.booking
+        booking.payment_status = 'rejected'
+        booking.save()
+        
+        # Send email notification to user
+        try:
+            EmailNotificationService.send_payment_rejected_email(
+                payment=payment,
+                rejection_reason=rejection_reason
+            )
+            logger.info(f"Payment rejection email sent for payment #{payment.id}")
+        except Exception as e:
+            logger.error(f"Failed to send payment rejection email for payment #{payment.id}: {str(e)}")
         
         return Response({
             'message': _('Payment rejected successfully.'),
-            'payment': PaymentSerializer(instance, context=self.get_serializer_context()).data
-        })
+            'payment': {
+                'id': payment.id,
+                'status': payment.status,
+                'verified_at': payment.verified_at
+            },
+            'booking': {
+                'id': booking.id,
+                'payment_status': booking.payment_status
+            }
+        }, status=status.HTTP_200_OK)
 
 
 class PaymentStatisticsView(APIView):
@@ -347,13 +399,13 @@ class PaymentStatisticsView(APIView):
         
         return Response(stats)
 
-# Add this new class for admin payments list
+
 class AdminPaymentListView(generics.ListAPIView):
     """
     List all payments for admin.
     """
     serializer_class = PaymentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'payment_method']
     search_fields = ['transaction_id', 'booking__user__email', 'booking__apartment__title']
@@ -361,19 +413,17 @@ class AdminPaymentListView(generics.ListAPIView):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        user = self.request.user
-        if user.role == 'admin':
-            return Payment.objects.all().select_related(
-                'booking', 'booking__user', 'booking__apartment'
-            )
-        return Payment.objects.none()
+        return Payment.objects.all().select_related(
+            'booking', 'booking__user', 'booking__apartment'
+        )
+
 
 class OwnerPaymentListView(generics.ListAPIView):
     """
     List payments for apartments owned by the logged-in user.
     """
     serializer_class = PaymentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'payment_method']
     search_fields = ['transaction_id', 'booking__user__email']

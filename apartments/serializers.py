@@ -1,7 +1,9 @@
 # stayease/apartments/serializers.py
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 from .models import Apartment, ApartmentMedia
+from bookings.models import Booking  # Add this import
 
 
 class ApartmentMediaSerializer(serializers.ModelSerializer):
@@ -56,24 +58,47 @@ class ApartmentMediaSerializer(serializers.ModelSerializer):
         
         return value
 
+
 class ApartmentSerializer(serializers.ModelSerializer):
     """
-    Serializer for apartments with nested media.
+    Serializer for apartments with nested media and payment information.
     """
     media = ApartmentMediaSerializer(many=True, read_only=True)
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
     owner_full_name = serializers.CharField(source='owner.full_name', read_only=True)
+    payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
+    is_booked = serializers.SerializerMethodField(read_only=True)  # Add this field
     
     class Meta:
         model = Apartment
         fields = [
             'id', 'title', 'description', 'price_daily', 'price_weekly', 
-            'price_monthly', 'district', 'sector', 'address', 'nearby_landmarks',
+            'price_monthly', 'payment_method', 'payment_method_display', 'payment_number',
+            'district', 'sector', 'address', 'nearby_landmarks',
             'is_furnished', 'has_wifi', 'has_parking', 'is_verified', 
-            'availability_status', 'owner', 'owner_email', 'owner_full_name',
+            'availability_status', 'is_booked',  # Add is_booked here
+            'owner', 'owner_email', 'owner_full_name',
             'media', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'owner', 'is_verified', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'owner', 'is_verified', 'is_booked', 'created_at', 'updated_at']
+    
+    def get_is_booked(self, obj):
+        """
+        Check if apartment is currently booked.
+        Returns True if there is a confirmed booking for current date range.
+        """
+        today = timezone.now().date()
+        
+        # Check for any confirmed booking that includes today's date
+        is_booked = Booking.objects.filter(
+            apartment=obj,
+            status=Booking.Status.CONFIRMED,
+            payment_status=Booking.PaymentStatus.VERIFIED,
+            start_date__lte=today,  # Booking started on or before today
+            end_date__gte=today      # Booking ends on or after today
+        ).exists()
+        
+        return is_booked
     
     def validate_price_daily(self, value):
         """Validate daily price is positive."""
@@ -83,8 +108,22 @@ class ApartmentSerializer(serializers.ModelSerializer):
             )
         return value
     
+    def validate_payment_number(self, value):
+        """Validate payment number format."""
+        if not value or not value.strip():
+            raise serializers.ValidationError(
+                _("Payment number is required.")
+            )
+        # Basic validation: should be at least 10 digits
+        cleaned = ''.join(filter(str.isdigit, value))
+        if len(cleaned) < 10:
+            raise serializers.ValidationError(
+                _("Please enter a valid phone number (minimum 10 digits).")
+            )
+        return value
+    
     def validate(self, data):
-        """Validate pricing consistency."""
+        """Validate pricing consistency and payment info."""
         price_daily = data.get('price_daily')
         price_weekly = data.get('price_weekly')
         price_monthly = data.get('price_monthly')
@@ -99,18 +138,31 @@ class ApartmentSerializer(serializers.ModelSerializer):
                 {"price_monthly": _("Monthly price should not be less than daily price × 30.")}
             )
         
+        # Validate payment information is provided
+        if not data.get('payment_method'):
+            raise serializers.ValidationError(
+                {"payment_method": _("Payment method is required.")}
+            )
+        
+        if not data.get('payment_number'):
+            raise serializers.ValidationError(
+                {"payment_number": _("Payment number is required.")}
+            )
+        
         return data
 
 
 class ApartmentCreateUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating and updating apartments.
+    Requires payment_method and payment_number when creating.
     """
     class Meta:
         model = Apartment
         fields = [
             'title', 'description', 'price_daily', 'price_weekly', 
-            'price_monthly', 'district', 'sector', 'address', 'nearby_landmarks',
+            'price_monthly', 'payment_method', 'payment_number',
+            'district', 'sector', 'address', 'nearby_landmarks',
             'is_furnished', 'has_wifi', 'has_parking', 'availability_status'
         ]
     
@@ -122,8 +174,22 @@ class ApartmentCreateUpdateSerializer(serializers.ModelSerializer):
             )
         return value
     
+    def validate_payment_number(self, value):
+        """Validate payment number format."""
+        if not value or not value.strip():
+            raise serializers.ValidationError(
+                _("Payment number is required.")
+            )
+        # Basic validation: should be at least 10 digits
+        cleaned = ''.join(filter(str.isdigit, value))
+        if len(cleaned) < 10:
+            raise serializers.ValidationError(
+                _("Please enter a valid phone number (minimum 10 digits).")
+            )
+        return value
+    
     def validate(self, data):
-        """Validate pricing consistency."""
+        """Validate pricing consistency and payment info."""
         price_daily = data.get('price_daily')
         price_weekly = data.get('price_weekly')
         price_monthly = data.get('price_monthly')
@@ -137,6 +203,17 @@ class ApartmentCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"price_monthly": _("Monthly price should not be less than daily price × 30.")}
             )
+        
+        # Validate payment information is provided for creation
+        if self.instance is None:  # Creating new apartment
+            if not data.get('payment_method'):
+                raise serializers.ValidationError(
+                    {"payment_method": _("Payment method is required.")}
+                )
+            if not data.get('payment_number'):
+                raise serializers.ValidationError(
+                    {"payment_number": _("Payment number is required.")}
+                )
         
         return data
 
@@ -156,6 +233,7 @@ class ApartmentVerifySerializer(serializers.ModelSerializer):
                 _("Verification can only set is_verified to True.")
             )
         return value
+
 
 class MultipleFileUploadSerializer(serializers.Serializer):
     """

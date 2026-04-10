@@ -1,9 +1,10 @@
-# stayease/bookings/models.py
+# stayease/bookings/models.py - Add booking_code field
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from .utils import generate_unique_booking_code  # Add this import
 
 
 class Booking(models.Model):
@@ -42,6 +43,15 @@ class Booking(models.Model):
     )
     
     # Booking details
+    booking_code = models.CharField(
+        _("booking code"),
+        max_length=50,
+        unique=True,
+        blank=False,
+        # Remove any default= from the field
+        help_text=_("Unique booking code (e.g., STE-234-AB-93)")
+    )
+    
     start_date = models.DateField(
         _("start date"),
         help_text=_("Check-in date")
@@ -73,6 +83,8 @@ class Booking(models.Model):
         _("payment method"),
         max_length=10,
         choices=PaymentMethod.choices,
+        blank=True,
+        null=True,
         help_text=_("Mobile money provider for payment")
     )
     
@@ -120,10 +132,12 @@ class Booking(models.Model):
             models.Index(fields=['apartment', 'start_date', 'end_date']),
             models.Index(fields=['status']),
             models.Index(fields=['payment_status']),
+            models.Index(fields=['booking_code']),  # Add index for booking_code
         ]
     
     def __str__(self):
-        return f"Booking #{self.id} - {self.user.email} - {self.apartment.title} ({self.start_date} to {self.end_date})"
+        code = self.booking_code or f"#{self.id}"
+        return f"Booking {code} - {self.user.email} - {self.apartment.title}"
     
     def clean(self):
         """
@@ -149,14 +163,18 @@ class Booking(models.Model):
     
     def save(self, *args, **kwargs):
         """
-        Override save to perform validation and calculate price if needed.
+        Override save to generate booking code, perform validation, and calculate price.
         """
+        # Generate booking code if not provided
+        if not self.booking_code or self.booking_code == 'TEMP-000':
+            from .utils import generate_unique_booking_code
+            self.booking_code = generate_unique_booking_code(Booking)
+        
         # Calculate total price if not provided
         if not self.total_price and self.start_date and self.end_date and self.apartment:
             nights = (self.end_date - self.start_date).days
             self.total_price = self.apartment.price_daily * nights
         
-        self.full_clean()
         super().save(*args, **kwargs)
     
     def get_nights(self):

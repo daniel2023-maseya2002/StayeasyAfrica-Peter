@@ -13,7 +13,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Booking
 from .serializers import (
     BookingSerializer, BookingSubmitPaymentSerializer,
-    BookingVerifyPaymentSerializer, BookingCancelSerializer
+    BookingVerifyPaymentSerializer, BookingCancelSerializer, 
+    BookingLookupSerializer, BookingLookupResponseSerializer
 )
 from .permissions import (
     IsBookingOwner, IsApartmentOwnerOrAdmin, CanVerifyPayment, IsAdmin
@@ -23,9 +24,11 @@ from utils.email_utils import EmailNotificationService
 from django.db import transaction
 
 User = get_user_model()
+
+
 class BookingCreateView(generics.CreateAPIView):
     """
-    Create a new booking.
+    Create a new booking with double booking prevention.
     """
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -34,6 +37,7 @@ class BookingCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         """
         Create booking and send notifications.
+        Double booking validation is handled in the serializer.
         """
         # Create booking
         booking = serializer.save(user=self.request.user)
@@ -51,6 +55,19 @@ class BookingCreateView(generics.CreateAPIView):
         )
         
         return booking
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Override create to handle validation errors gracefully.
+        """
+        try:
+            return super().create(request, *args, **kwargs)
+        except serializers.ValidationError as e:
+            return Response(
+                {'error': e.detail},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 class MyBookingsView(generics.ListAPIView):
     """
@@ -81,7 +98,7 @@ class OwnerBookingsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'payment_status', 'apartment']
-    search_fields = ['user__email', 'user__full_name', 'payment_reference']
+    search_fields = ['user__email', 'user__full_name', 'payment_reference', 'booking_code']
     ordering_fields = ['start_date', 'created_at', 'total_price']
     ordering = ['-created_at']
     
@@ -265,6 +282,7 @@ class CancelBookingView(generics.UpdateAPIView):
 class ApartmentAvailabilityView(APIView):
     """
     Check apartment availability for specific dates.
+    Only confirmed bookings with verified payments block dates.
     """
     permission_classes = [permissions.AllowAny]
     
@@ -310,10 +328,11 @@ class ApartmentAvailabilityView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check for overlapping confirmed bookings
+        # Check for overlapping confirmed bookings (only those with verified payments)
         overlapping = Booking.objects.filter(
             apartment_id=apartment_id,
             status=Booking.Status.CONFIRMED,
+            payment_status=Booking.PaymentStatus.VERIFIED,
             start_date__lt=end_date,
             end_date__gt=start_date
         ).exists()
@@ -325,6 +344,7 @@ class ApartmentAvailabilityView(APIView):
             'end_date': end_date,
             'message': _('Apartment is available for these dates.') if not overlapping else _('Apartment is already booked for these dates.')
         })
+
 
 class AdminBookingListView(generics.ListAPIView):
     """
@@ -340,6 +360,7 @@ class AdminBookingListView(generics.ListAPIView):
     
     def get_queryset(self):
         return Booking.objects.all().select_related('user', 'apartment')
+
 
 class OwnerBookingListView(generics.ListAPIView):
     """
@@ -357,3 +378,50 @@ class OwnerBookingListView(generics.ListAPIView):
         return Booking.objects.filter(
             apartment__owner=self.request.user
         ).select_related('user', 'apartment', 'apartment__owner')
+
+
+class BookingLookupView(APIView):
+    """
+    Look up booking by email and booking code.
+    No authentication required.
+    """
+    permission_classes = [AllowAny]
+    
+    @swagger_auto_schema(
+        operation_description="Look up booking using email and booking code",
+        request_body=BookingLookupSerializer,
+        responses={
+            200: openapi.Response('Booking found', BookingLookupResponseSerializer),
+            400: 'Bad Request',
+            404: 'Not Found'
+        }
+    )
+    def post(self, request):
+        """
+        Retrieve booking details using email and booking code.
+        """
+        serializer = BookingLookupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        booking = serializer.validated_data['booking']
+        
+        response_data = {
+            'id': booking.id,
+            'booking_code': booking.booking_code,
+            'apartment_title': booking.apartment.title,
+            'apartment_district': booking.apartment.district,
+            'apartment_sector': booking.apartment.sector,
+            'apartment_address': booking.apartment.address,
+            'owner_phone_number': booking.apartment.owner.phone_number,
+            'start_date': booking.start_date,
+            'end_date': booking.end_date,
+            'total_price': booking.total_price,
+            'booking_status': booking.status,
+            'payment_status': booking.payment_status,
+            'nights': booking.get_nights(),
+            'user_name': booking.user.full_name,
+            'user_email': booking.user.email,
+            'phone_number': booking.phone_number,
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)

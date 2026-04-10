@@ -14,6 +14,10 @@ class Apartment(models.Model):
         AVAILABLE = 'available', _('Available')
         BOOKED = 'booked', _('Booked')
     
+    class PaymentMethod(models.TextChoices):
+        MTN = 'mtn', _('MTN Mobile Money')
+        AIRTEL = 'airtel', _('Airtel Money')
+    
     # Basic information
     title = models.CharField(
         _("title"),
@@ -47,6 +51,20 @@ class Apartment(models.Model):
         null=True,
         blank=True,
         help_text=_("Price per month (optional)")
+    )
+    
+    # Payment information
+    payment_method = models.CharField(
+        _("payment method"),
+        max_length=10,
+        choices=PaymentMethod.choices,
+        help_text=_("Preferred mobile money provider for receiving payments")
+    )
+    
+    payment_number = models.CharField(
+        _("payment number"),
+        max_length=20,
+        help_text=_("Phone number for receiving mobile money payments")
     )
     
     # Location
@@ -129,6 +147,7 @@ class Apartment(models.Model):
             models.Index(fields=['owner', 'created_at']),
             models.Index(fields=['district', 'sector']),
             models.Index(fields=['availability_status']),
+            models.Index(fields=['payment_method']),
         ]
     
     def __str__(self):
@@ -152,21 +171,21 @@ class Apartment(models.Model):
         
         super().save(*args, **kwargs)
 
-        @property
-        def average_rating(self):
-            """
-            Calculate average rating from all reviews.
-            """
-            from django.db.models import Avg
-            avg = self.reviews.aggregate(Avg('rating'))['rating__avg']
-            return round(avg, 1) if avg else None
-        
-        @property
-        def total_reviews(self):
-            """
-            Get total number of reviews.
-            """
-            return self.reviews.count()
+    @property
+    def average_rating(self):
+        """
+        Calculate average rating from all reviews.
+        """
+        from django.db.models import Avg
+        avg = self.reviews.aggregate(Avg('rating'))['rating__avg']
+        return round(avg, 1) if avg else None
+    
+    @property
+    def total_reviews(self):
+        """
+        Get total number of reviews.
+        """
+        return self.reviews.count()
 
 
 class ApartmentMedia(models.Model):

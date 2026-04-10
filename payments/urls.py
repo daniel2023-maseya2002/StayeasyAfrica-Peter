@@ -7,9 +7,6 @@ app_name = 'payments'
 urlpatterns = [
     # Admin endpoints
     path('admin/', views.AdminPaymentListView.as_view(), name='admin-payment-list'),
-
-    # Add this line to urlpatterns
-    path('owner/', views.OwnerPaymentListView.as_view(), name='owner-payment-list'),
     
     # Payment submission and listing
     path('', views.PaymentSubmitView.as_view(), name='payment-submit'),

@@ -7,10 +7,11 @@ from bookings.models import Booking
 
 class PaymentSerializer(serializers.ModelSerializer):
     """
-    Serializer for payments.
+    Serializer for payments with booking code included.
     """
     booking_id = serializers.IntegerField(write_only=True, required=False)
     booking_reference = serializers.CharField(source='booking.id', read_only=True)
+    booking_code = serializers.CharField(source='booking.booking_code', read_only=True)  # Add booking_code
     user_email = serializers.EmailField(source='booking.user.email', read_only=True)
     user_full_name = serializers.CharField(source='booking.user.full_name', read_only=True)
     apartment_title = serializers.CharField(source='booking.apartment.title', read_only=True)
@@ -19,14 +20,15 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = [
-            'id', 'booking', 'booking_id', 'booking_reference',
+            'id', 'booking', 'booking_id', 'booking_reference', 'booking_code',  # Add booking_code here
             'user_email', 'user_full_name', 'apartment_title', 'apartment_owner',
             'amount', 'payment_method', 'transaction_id', 'status',
             'created_at', 'verified_at'
         ]
         read_only_fields = [
             'id', 'booking', 'amount', 'status', 'created_at', 'verified_at',
-            'booking_reference', 'user_email', 'user_full_name', 'apartment_title', 'apartment_owner'
+            'booking_reference', 'booking_code', 'user_email', 'user_full_name', 
+            'apartment_title', 'apartment_owner'
         ]
     
     def validate_booking_id(self, value):
@@ -167,7 +169,6 @@ class PaymentRejectSerializer(serializers.ModelSerializer):
         instance.reject()
         
         # Optionally store rejection reason if field exists
-        # Could extend Payment model with rejection_reason field
         rejection_reason = validated_data.get('rejection_reason')
         if rejection_reason:
             # Store in a log or add field to model

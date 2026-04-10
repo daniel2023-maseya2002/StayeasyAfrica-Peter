@@ -4,128 +4,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Booking - StayEase Africa</title>
+    <title>Booking Confirmation - StayEase Africa</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: #1a1a2e;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         .container {
-            max-width: 600px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 580px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            overflow: hidden;
         }
         .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
             text-align: center;
-            padding: 20px 0;
-            border-bottom: 2px solid #f0f0f0;
+        }
+        .header h2 {
+            color: white;
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .header p {
+            color: rgba(255,255,255,0.9);
+            margin: 10px 0 0;
+            font-size: 14px;
         }
         .content {
-            padding: 30px 20px;
+            padding: 40px 30px;
+            background: #ffffff;
         }
-        .booking-details {
-            background-color: #f8f9fa;
-            border-radius: 8px;
+        .greeting {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 16px;
+        }
+        .message {
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .booking-code-box {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid #bbf7d0;
+        }
+        .booking-code-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #166534;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .booking-code-value {
+            font-size: 32px;
+            font-weight: 800;
+            font-family: 'Courier New', monospace;
+            color: #15803d;
+            letter-spacing: 2px;
+            background: white;
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 40px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title span {
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+        .details-card {
+            background: #f8fafc;
+            border-radius: 20px;
             padding: 20px;
-            margin: 20px 0;
+            margin-bottom: 24px;
+            border: 1px solid #e2e8f0;
         }
         .detail-row {
-            margin: 10px 0;
-            padding: 5px 0;
-            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
         }
         .detail-label {
-            font-weight: bold;
-            color: #555;
+            font-weight: 600;
+            color: #475569;
+            font-size: 14px;
         }
-        .amount {
-            font-size: 24px;
-            font-weight: bold;
-            color: #28a745;
+        .detail-value {
+            color: #1e293b;
+            font-weight: 500;
+            font-size: 14px;
         }
-        .footer {
+        .price-value {
+            font-size: 20px;
+            font-weight: 800;
+            color: #667eea;
+        }
+        .payment-card {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border-radius: 20px;
+            padding: 24px;
             text-align: center;
-            padding: 20px;
-            border-top: 1px solid #f0f0f0;
+            margin-bottom: 24px;
+            border: 1px solid #fde68a;
+        }
+        .payment-label {
             font-size: 12px;
-            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #92400e;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .payment-number {
+            font-size: 28px;
+            font-weight: 800;
+            font-family: monospace;
+            color: #d97706;
+            letter-spacing: 1px;
+        }
+        .instruction-box {
+            background: #eff6ff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border-left: 4px solid #3b82f6;
+        }
+        .instruction-title {
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        .instruction-list {
+            margin: 0;
+            padding-left: 20px;
+            color: #1e3a8a;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .instruction-list li {
+            margin: 8px 0;
+        }
+        .warning-box {
+            background: #fef2f2;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            color: #991b1b;
         }
         .button {
             display: inline-block;
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: #fff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             text-decoration: none;
-            border-radius: 5px;
-            margin-top: 20px;
+            padding: 14px 32px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102,126,234,0.4);
+        }
+        .footer {
+            background: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer p {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #64748b;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .social-icons {
+            margin-top: 15px;
+        }
+        .social-icons a {
+            margin: 0 8px;
+            color: #94a3b8;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h2>{{ company_name }}</h2>
+            <h2>✨ StayEase Africa</h2>
+            <p>Your journey to comfort begins here</p>
         </div>
         
         <div class="content">
-            <h3>New Booking Received!</h3>
+            <div class="greeting">
+                Hello, {{ user_full_name }}! 👋
+            </div>
             
-            <p>Hello,</p>
+            <div class="message">
+                Your booking has been successfully created! We're excited to host you. Please review the details below and complete the payment to confirm your reservation.
+            </div>
             
-            <p>A new booking has been created for <strong>{{ apartment_title }}</strong>.</p>
+            <!-- Booking Code Section -->
+            <div class="booking-code-box">
+                <div class="booking-code-label">Your Booking Code</div>
+                <div class="booking-code-value">{{ booking_code }}</div>
+                <div style="font-size: 11px; color: #166534; margin-top: 10px;">✨ Keep this code for future reference</div>
+            </div>
             
-            <div class="booking-details">
-                <h4>Booking Details:</h4>
+            <!-- Booking Details -->
+            <div class="section-title">
+                <span>📋</span> Booking Details
+            </div>
+            <div class="details-card">
                 <div class="detail-row">
-                    <span class="detail-label">Booking ID:</span> #{{ booking_id }}
+                    <span class="detail-label">🏠 Apartment</span>
+                    <span class="detail-value">{{ apartment_title }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Guest:</span> {{ user_full_name }} ({{ user_email }})
+                    <span class="detail-label">📍 Location</span>
+                    <span class="detail-value">{{ apartment_location }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Phone:</span> {{ phone_number }}
+                    <span class="detail-label">📅 Check-in</span>
+                    <span class="detail-value">{{ start_date }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Check-in:</span> {{ start_date|date:"F j, Y" }}
+                    <span class="detail-label">📅 Check-out</span>
+                    <span class="detail-value">{{ end_date }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Check-out:</span> {{ end_date|date:"F j, Y" }}
+                    <span class="detail-label">🌙 Nights</span>
+                    <span class="detail-value">{{ nights }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Nights:</span> {{ nights }}
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Location:</span> {{ apartment_location }}
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Total Price:</span> 
-                    <span class="amount">${{ total_price }}</span>
+                    <span class="detail-label">💰 Total Price</span>
+                    <span class="detail-value price-value">${{ total_price }}</span>
                 </div>
             </div>
             
-            <p><strong>Next Steps:</strong></p>
-            <ol>
-                <li>Wait for the guest to submit payment reference</li>
-                <li>Verify the payment when received</li>
-                <li>Confirm the booking after verification</li>
-            </ol>
+            <!-- Payment Information -->
+            <div class="section-title">
+                <span>💳</span> Payment Information
+            </div>
+            <div class="payment-card">
+                <div class="payment-label">Send Payment To (Mobile Money)</div>
+                <div class="payment-number">{{ owner_phone_number }}</div>
+                <div style="font-size: 12px; color: #92400e; margin-top: 8px;">MTN Mobile Money or Airtel Money</div>
+            </div>
             
-            <p style="text-align: center;">
-                <a href="{{ dashboard_url }}" class="button">View in Dashboard</a>
-            </p>
+            <!-- Instructions -->
+            <div class="instruction-box">
+                <div class="instruction-title">📝 How to Complete Your Booking</div>
+                <ol class="instruction-list">
+                    <li>Send the total amount of <strong>${{ total_price }}</strong> to the payment number above</li>
+                    <li>After sending payment, go to <strong>"My Bookings"</strong> in your account</li>
+                    <li>Click <strong>"Submit Payment"</strong> for this booking</li>
+                    <li>Enter your transaction reference number from the SMS</li>
+                    <li>Wait for the apartment owner to verify your payment</li>
+                </ol>
+            </div>
+            
+            <!-- Important Notes -->
+            <div class="warning-box">
+                <strong>⚠️ Important Notes:</strong><br>
+                • Your booking is not confirmed until payment is verified<br>
+                • Keep your transaction reference number as proof of payment<br>
+                • You will receive an email once your payment is verified<br>
+                • Contact support if you need assistance
+            </div>
+            
+            <!-- CTA Button -->
+            <div style="text-align: center;">
+                <a href="{{ dashboard_url }}" class="button">Go to My Bookings →</a>
+            </div>
         </div>
         
         <div class="footer">
-            <p>&copy; {{ year|default:"2024" }} {{ company_name }}. All rights reserved.</p>
+            <p>&copy; {{ current_year }} {{ company_name }}. All rights reserved.</p>
+            <p>Making stays easy across Africa ❤️</p>
+            <div class="social-icons">
+                <a href="#">🌐</a>
+                <a href="#">📧</a>
+                <a href="#">📱</a>
+            </div>
             <p>
-                <a href="mailto:{{ support_email }}" style="color: #777;">Contact Support</a>
+                <a href="mailto:{{ support_email }}">Contact Support</a>
             </p>
         </div>
     </div>
