@@ -135,27 +135,50 @@ class BookingSerializer(serializers.ModelSerializer):
 class BookingLookupSerializer(serializers.Serializer):
     """
     Serializer for booking lookup by email and booking code.
+    Email is optional for authenticated users.
     """
-    email = serializers.EmailField(required=True)
+    email = serializers.EmailField(required=False)
     booking_code = serializers.CharField(max_length=50, required=True)
     
     def validate(self, attrs):
         """
-        Validate that a booking exists with the given email and booking code.
+        Validate that a booking exists with the given information.
+        - Authenticated users: only need booking_code
+        - Unauthenticated users: need email + booking_code
         """
-        email = attrs.get('email')
+        request = self.context.get('request')
         booking_code = attrs.get('booking_code')
+        email = attrs.get('email')
         
-        try:
-            booking = Booking.objects.select_related('user', 'apartment', 'apartment__owner').get(
-                user__email=email,
-                booking_code=booking_code
-            )
-            attrs['booking'] = booking
-        except Booking.DoesNotExist:
-            raise serializers.ValidationError(
-                _("No booking found with the provided email and booking code.")
-            )
+        if request and request.user.is_authenticated:
+            # Authenticated user - filter by user and booking_code
+            try:
+                booking = Booking.objects.select_related('user', 'apartment', 'apartment__owner').get(
+                    booking_code=booking_code,
+                    user=request.user
+                )
+                attrs['booking'] = booking
+            except Booking.DoesNotExist:
+                raise serializers.ValidationError(
+                    _("No booking found with the provided booking code.")
+                )
+        else:
+            # Unauthenticated user - require email
+            if not email:
+                raise serializers.ValidationError(
+                    _("Email is required for booking lookup.")
+                )
+            
+            try:
+                booking = Booking.objects.select_related('user', 'apartment', 'apartment__owner').get(
+                    booking_code=booking_code,
+                    user__email=email
+                )
+                attrs['booking'] = booking
+            except Booking.DoesNotExist:
+                raise serializers.ValidationError(
+                    _("No booking found with the provided email and booking code.")
+                )
         
         return attrs
 

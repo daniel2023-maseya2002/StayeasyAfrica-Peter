@@ -383,7 +383,8 @@ class OwnerBookingListView(generics.ListAPIView):
 class BookingLookupView(APIView):
     """
     Look up booking by email and booking code.
-    No authentication required.
+    - Authenticated users: only need booking_code
+    - Unauthenticated users: need email + booking_code
     """
     permission_classes = [AllowAny]
     
@@ -399,11 +400,46 @@ class BookingLookupView(APIView):
     def post(self, request):
         """
         Retrieve booking details using email and booking code.
+        Authenticated users only need booking_code.
         """
-        serializer = BookingLookupSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        user = request.user
+        is_authenticated = user.is_authenticated
         
-        booking = serializer.validated_data['booking']
+        data = request.data
+        booking_code = data.get('booking_code')
+        
+        if not booking_code:
+            return Response(
+                {'error': _('Booking code is required.')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            if is_authenticated:
+                # Authenticated user: filter by user and booking_code
+                booking = Booking.objects.select_related('user', 'apartment', 'apartment__owner').get(
+                    booking_code=booking_code,
+                    user=user
+                )
+            else:
+                # Unauthenticated user: require email as well
+                email = data.get('email')
+                if not email:
+                    return Response(
+                        {'error': _('Email is required for unauthenticated users.')},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                booking = Booking.objects.select_related('user', 'apartment', 'apartment__owner').get(
+                    booking_code=booking_code,
+                    user__email=email
+                )
+                
+        except Booking.DoesNotExist:
+            return Response(
+                {'error': _('No booking found with the provided information.')},
+                status=status.HTTP_404_NOT_FOUND
+            )
         
         response_data = {
             'id': booking.id,
