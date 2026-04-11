@@ -21,7 +21,7 @@ from django.utils import timezone
 from django.contrib.sites.models import Site
 from .serializers import (
     RegisterSerializer, LoginSerializer, UserSerializer,
-    UserCreateSerializer, UserUpdateSerializer, RequestOTPSerializer, VerifyOTPSerializer, ResetPasswordSerializer
+    UserCreateSerializer, UserUpdateSerializer, RequestOTPSerializer, VerifyOTPSerializer, ResetPasswordSerializer, GoogleLoginSerializer
 )
 from .models import User, PasswordResetOTP
 from .permissions import IsAdmin, IsOwnerOrSelf, IsAdminOrReadOnly
@@ -169,6 +169,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     Retrieve, update, or delete a user.
     - Admin can access any user
     - Regular users can only access their own profile
+    - Hard delete: permanently removes user from database
     """
     permission_classes = [IsAuthenticated, IsOwnerOrSelf]
     queryset = User.objects.all()
@@ -179,14 +180,32 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         return UserSerializer
     
     def perform_destroy(self, instance):
-        """Soft delete by deactivating user instead of hard delete."""
-        instance.is_active = False
-        instance.save()
+        """Hard delete user from database."""
+        # Prevent admin from deleting themselves
+        if self.request.user == instance:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(_("You cannot delete your own account."))
+        
+        # Store user email for response message
+        user_email = instance.email
+        
+        # Hard delete the user
+        instance.delete()
+        
+        # Return success response
         return Response(
-            {'message': _('User deactivated successfully.')},
+            {'message': _(f'User {user_email} has been permanently deleted.')},
             status=status.HTTP_200_OK
         )
-
+    
+    def delete(self, request, *args, **kwargs):
+        """Override delete to return custom response."""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {'message': _('User deleted successfully.')},
+            status=status.HTTP_200_OK
+        )
 
 class AdminUserCreateView(generics.CreateAPIView):
     """
@@ -466,3 +485,71 @@ class TestAuthView(APIView):
             'user_email': request.user.email,
             'user_role': request.user.role,
         })
+
+class GoogleLoginView(APIView):
+    """
+    Google OAuth2 login view.
+    Accepts Google ID token and returns JWT tokens.
+    """
+    permission_classes = []
+    authentication_classes = []
+    
+    @swagger_auto_schema(
+        operation_description="Login with Google ID token",
+        request_body=GoogleLoginSerializer,
+        responses={
+            200: "Login successful",
+            400: "Bad Request",
+            401: "Invalid token"
+        }
+    )
+    def post(self, request):
+        """
+        Handle Google login with ID token.
+        """
+        serializer = GoogleLoginSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.context.get('email')
+        full_name = serializer.context.get('full_name')
+        
+        if not email:
+            return Response(
+                {'error': _('Could not extract email from Google token')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Check if user exists
+            user = User.objects.get(email=email)
+            logger.info(f"Existing user logged in via Google: {email}")
+        except User.DoesNotExist:
+            # Create new user
+            user = User.objects.create_user(
+                email=email,
+                full_name=full_name,
+                role=User.Role.USER,
+                is_active=True
+            )
+            logger.info(f"New user created via Google: {email}")
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        
+        # Get user data
+        user_data = {
+            'id': user.id,
+            'email': user.email,
+            'full_name': user.full_name,
+            'role': user.role,
+            'is_verified': user.is_verified,
+        }
+        
+        return Response({
+            'message': _('Login successful'),
+            'user': user_data,
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }
+        }, status=status.HTTP_200_OK)

@@ -23,4 +23,6 @@ urlpatterns = [
     path('<int:pk>/', views.UserDetailView.as_view(), name='user-detail'),
 
     path('test-auth/', views.TestAuthView.as_view(), name='test-auth'),
+
+    path('auth/google/', views.GoogleLoginView.as_view(), name='google-login'),
 ]

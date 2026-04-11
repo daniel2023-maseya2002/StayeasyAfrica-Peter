@@ -6,6 +6,10 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext_lazy as _
 from .models import User, PasswordResetOTP
 from django.contrib.auth import get_user_model
+import google.oauth2.id_token
+from google.auth.transport import requests
+from django.conf import settings
+
 
 User = get_user_model()
 
@@ -490,3 +494,43 @@ class ResetPasswordSerializer(serializers.Serializer):
         ).delete()
         
         return user
+
+class GoogleLoginSerializer(serializers.Serializer):
+    """
+    Serializer for Google login.
+    """
+    token = serializers.CharField(required=True, help_text=_("Google ID token"))
+    
+    def validate_token(self, value):
+        """
+        Validate and verify the Google ID token.
+        """
+        try:
+            # Verify the token with Google
+            id_info = google.oauth2.id_token.verify_oauth2_token(
+                value,
+                requests.Request(),
+                settings.GOOGLE_CLIENT_ID
+            )
+            
+            # Check if token is valid
+            if id_info is None:
+                raise serializers.ValidationError(_("Invalid token"))
+            
+            # Extract user information
+            email = id_info.get('email')
+            name = id_info.get('name', email.split('@')[0])
+            
+            if not email:
+                raise serializers.ValidationError(_("Email not provided by Google"))
+            
+            # Store user info in validated data
+            self.context['email'] = email
+            self.context['full_name'] = name
+            
+            return value
+            
+        except ValueError as e:
+            raise serializers.ValidationError(_("Invalid token: ") + str(e))
+        except Exception as e:
+            raise serializers.ValidationError(_("Token verification failed: ") + str(e))
