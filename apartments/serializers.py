@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from .models import Apartment, ApartmentMedia
-from bookings.models import Booking  # Add this import
+from bookings.models import Booking
 
 
 class ApartmentMediaSerializer(serializers.ModelSerializer):
@@ -67,7 +67,7 @@ class ApartmentSerializer(serializers.ModelSerializer):
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
     owner_full_name = serializers.CharField(source='owner.full_name', read_only=True)
     payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
-    is_booked = serializers.SerializerMethodField(read_only=True)  # Add this field
+    is_booked = serializers.SerializerMethodField(read_only=True)
     
     class Meta:
         model = Apartment
@@ -76,11 +76,11 @@ class ApartmentSerializer(serializers.ModelSerializer):
             'price_monthly', 'payment_method', 'payment_method_display', 'payment_number',
             'district', 'sector', 'address', 'nearby_landmarks',
             'is_furnished', 'has_wifi', 'has_parking', 'is_verified', 
-            'availability_status', 'is_booked',  # Add is_booked here
+            'availability_status', 'is_booked', 'views_count',
             'owner', 'owner_email', 'owner_full_name',
             'media', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'owner', 'is_verified', 'is_booked', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'owner', 'is_verified', 'is_booked', 'views_count', 'created_at', 'updated_at']
     
     def get_is_booked(self, obj):
         """
@@ -94,8 +94,8 @@ class ApartmentSerializer(serializers.ModelSerializer):
             apartment=obj,
             status=Booking.Status.CONFIRMED,
             payment_status=Booking.PaymentStatus.VERIFIED,
-            start_date__lte=today,  # Booking started on or before today
-            end_date__gte=today      # Booking ends on or after today
+            start_date__lte=today,
+            end_date__gte=today
         ).exists()
         
         return is_booked
@@ -244,3 +244,13 @@ class MultipleFileUploadSerializer(serializers.Serializer):
         allow_empty=False,
         write_only=True
     )
+
+
+class ApartmentAnalyticsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for apartment analytics (admin only).
+    """
+    class Meta:
+        model = Apartment
+        fields = ['id', 'title', 'views_count', 'district', 'created_at']
+        read_only_fields = ['id', 'title', 'views_count', 'district', 'created_at']

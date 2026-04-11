@@ -119,6 +119,13 @@ class Apartment(models.Model):
         help_text=_("Current availability status of the apartment")
     )
     
+    # View tracking
+    views_count = models.IntegerField(
+        _("views count"),
+        default=0,
+        help_text=_("Number of times this apartment has been viewed")
+    )
+    
     # Relationships
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -148,10 +155,16 @@ class Apartment(models.Model):
             models.Index(fields=['district', 'sector']),
             models.Index(fields=['availability_status']),
             models.Index(fields=['payment_method']),
+            models.Index(fields=['-views_count']),  # Index for sorting by views
         ]
     
     def __str__(self):
         return f"{self.title} - {self.district}"
+    
+    def increment_views(self):
+        """Increment the view count for this apartment."""
+        self.views_count += 1
+        self.save(update_fields=['views_count', 'updated_at'])
     
     def save(self, *args, **kwargs):
         """

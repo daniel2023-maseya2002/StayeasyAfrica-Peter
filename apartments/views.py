@@ -10,11 +10,13 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.db import models as django_models
 
 from .models import Apartment, ApartmentMedia
 from .serializers import (
     ApartmentSerializer, ApartmentCreateUpdateSerializer,
-    ApartmentVerifySerializer, ApartmentMediaSerializer
+    ApartmentVerifySerializer, ApartmentMediaSerializer,
+    ApartmentAnalyticsSerializer
 )
 from .permissions import (
     IsOwner, IsAdminOrReadOnly, IsOwnerOrReadOnly, 
@@ -62,7 +64,8 @@ class ApartmentListView(generics.ListCreateAPIView):
     ordering_fields = [
         'price_daily', 
         'created_at', 
-        'updated_at'
+        'updated_at',
+        'views_count'
     ]
     ordering = ['-created_at']  # Default ordering: newest first
     
@@ -129,7 +132,7 @@ class ApartmentListView(generics.ListCreateAPIView):
             openapi.Parameter('search', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='Search by title, description, address, or landmarks'),
             
             # Ordering parameters
-            openapi.Parameter('ordering', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='Order by field (price_daily, created_at, -price_daily, -created_at)'),
+            openapi.Parameter('ordering', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='Order by field (price_daily, created_at, -price_daily, -created_at, views_count, -views_count)'),
         ],
         responses={
             200: ApartmentSerializer(many=True),
@@ -152,6 +155,7 @@ class ApartmentListView(generics.ListCreateAPIView):
 class ApartmentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update or delete an apartment.
+    Increments view count when retrieved.
     """
     queryset = Apartment.objects.all().select_related('owner').prefetch_related('media')
     permission_classes = [IsOwnerOrReadOnly]
@@ -163,6 +167,18 @@ class ApartmentDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method in ['PUT', 'PATCH']:
             return ApartmentCreateUpdateSerializer
         return ApartmentSerializer
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Retrieve apartment details and increment view count.
+        """
+        instance = self.get_object()
+        
+        # Increment view count for every retrieval
+        instance.increment_views()
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
     
     def perform_update(self, serializer):
         """
@@ -486,3 +502,62 @@ class OwnerApartmentListView(generics.ListAPIView):
     
     def get_queryset(self):
         return Apartment.objects.filter(owner=self.request.user).select_related('owner').prefetch_related('media')
+
+
+class ApartmentAnalyticsView(APIView):
+    """
+    Get apartment analytics (admin only).
+    Returns apartments sorted by view count.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    
+    @swagger_auto_schema(
+        operation_description="Get apartment analytics with view counts (admin only)",
+        manual_parameters=[
+            openapi.Parameter('sort', openapi.IN_QUERY, type=openapi.TYPE_STRING, 
+                            enum=['most_viewed', 'least_viewed'], description='Sort order'),
+            openapi.Parameter('limit', openapi.IN_QUERY, type=openapi.TYPE_INTEGER, description='Limit results'),
+        ],
+        responses={200: "Apartment analytics data", 403: "Forbidden"}
+    )
+    def get(self, request):
+        """
+        Return apartment analytics with view counts.
+        Can sort by most viewed or least viewed.
+        """
+        sort_by = request.query_params.get('sort', 'most_viewed')
+        limit = request.query_params.get('limit')
+        
+        queryset = Apartment.objects.all()
+        
+        # Apply sorting
+        if sort_by == 'most_viewed':
+            queryset = queryset.order_by('-views_count')
+        elif sort_by == 'least_viewed':
+            queryset = queryset.order_by('views_count')
+        else:
+            queryset = queryset.order_by('-views_count')
+        
+        # Apply limit if provided
+        if limit:
+            try:
+                limit = int(limit)
+                queryset = queryset[:limit]
+            except ValueError:
+                pass
+        
+        serializer = ApartmentAnalyticsSerializer(queryset, many=True)
+        
+        # Calculate summary statistics
+        total_apartments = Apartment.objects.count()
+        total_views = Apartment.objects.aggregate(total=django_models.Sum('views_count'))['total'] or 0
+        avg_views = total_views / total_apartments if total_apartments > 0 else 0
+        
+        return Response({
+            'summary': {
+                'total_apartments': total_apartments,
+                'total_views': total_views,
+                'average_views_per_apartment': round(avg_views, 2),
+            },
+            'results': serializer.data
+        }, status=status.HTTP_200_OK)
