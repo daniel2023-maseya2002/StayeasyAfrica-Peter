@@ -220,3 +220,8 @@ SIMPLE_JWT = {
 
 # Google OAuth2
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
+
+# settings.py
+LIBRETRANSLATE_URL = 'https://libretranslate.de/translate'
+# Alternative: Self-hosted LibreTranslate instance
+# LIBRETRANSLATE_URL = 'http://localhost:5000/translate'
