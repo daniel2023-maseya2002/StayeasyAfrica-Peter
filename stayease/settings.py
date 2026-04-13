@@ -102,7 +102,9 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # For development only - allows all origins (uncomment if needed)
-# CORS_ALLOW_ALL_ORIGINS = True  # Only use for development
+CORS_ALLOWED_ORIGINS = [
+    "https://stayeasy-africa-peter-frontend.vercel.app",
+]
 
 ROOT_URLCONF = 'stayease.urls'
 
