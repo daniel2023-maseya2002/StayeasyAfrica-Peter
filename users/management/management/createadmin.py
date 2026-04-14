@@ -10,17 +10,22 @@ class Command(BaseCommand):
         email = "maseyadaniel@gmail.com"
         password = "Smooth1."
 
-        if not User.objects.filter(email=email).exists():
-            user = User.objects.create_superuser(
+        if User.objects.filter(email=email).exists():
+            self.stdout.write("Admin already exists")
+            return
+
+        try:
+            user = User.objects.create(
                 email=email,
-                full_name="Admin",
-                password=password,
-                role="admin"
+                full_name="Daniel Maseya",
+                role="admin",
+                is_staff=True,
+                is_superuser=True,
             )
-            user.is_staff = True
-            user.is_superuser = True
+            user.set_password(password)  # 🔐 hash password properly
             user.save()
 
             self.stdout.write(self.style.SUCCESS("Admin created successfully"))
-        else:
-            self.stdout.write("Admin already exists")
+
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Error creating admin: {e}"))
